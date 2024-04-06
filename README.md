@@ -1,5 +1,7 @@
 # Keccak-f[1600] NIF (SHA3-224, SHA3-256, SHA3-384, SHA3-512, SHAKE128, SHAKE256)
 
+*This is the original keccak-f1600 as used in Ethereum.*
+
 [Keccak-f[1600]](http://keccak.noekeon.org/) NIF with timeslice reductions for Erlang and Elixir.
 
 The timeslice reductions allow the NIF to perform operations on very large inputs without blocking the scheduler or requiring the Erlang VM to support dirty schedulers.  See the [bitwise](https://github.com/vinoski/bitwise) project from which the strategy was derived.
