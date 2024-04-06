@@ -6,120 +6,38 @@ BASEDIR := $(abspath $(CURDIR)/..)
 PROJECT ?= keccakf1600
 PROJECT := $(strip $(PROJECT))
 
-C_SRC_DIR ?= $(CURDIR)
-C_SRC_ENV ?= $(C_SRC_DIR)/env.mk
-C_SRC_OUTPUT ?= $(CURDIR)/../priv/$(PROJECT)
-ifeq (,$(STATIC_ERLANG_NIF))
-C_SRC_TYPE ?= shared
-else
-C_SRC_TYPE ?= static
-endif
+ERTS_INCLUDE_DIR ?= $(shell erl -noshell -eval "io:format(\"~ts/erts-~ts/include/\", [code:root_dir(), erlang:system_info(version)])." -s init stop)
+ERL_INTERFACE_INCLUDE_DIR ?= $(shell erl -noshell -eval "io:format(\"~ts\", [code:lib_dir(erl_interface, include)])." -s init stop)
+ERL_INTERFACE_LIB_DIR ?= $(shell erl -noshell -eval "io:format(\"~ts\", [code:lib_dir(erl_interface, lib)])." -s init stop)
 
-OTP_VERSION = $(shell erl -eval 'erlang:display(erlang:system_info(otp_release)), halt().')
+C_SRC_DIR = $(CURDIR)
+C_SRC_OUTPUT ?= $(CURDIR)/../priv/$(PROJECT).so
+
 # System type and C compiler/flags.
 
-ifeq ($(PLATFORM),)
-UNAME_S := $(shell uname -s)
-
-ifeq ($(UNAME_S),Linux)
-PLATFORM = linux
-else ifeq ($(UNAME_S),Darwin)
-PLATFORM = darwin
-else ifeq ($(UNAME_S),SunOS)
-PLATFORM = solaris
-else ifeq ($(UNAME_S),GNU)
-PLATFORM = gnu
-else ifeq ($(UNAME_S),FreeBSD)
-PLATFORM = freebsd
-else ifeq ($(UNAME_S),NetBSD)
-PLATFORM = netbsd
-else ifeq ($(UNAME_S),OpenBSD)
-PLATFORM = openbsd
-else ifeq ($(UNAME_S),DragonFly)
-PLATFORM = dragonfly
-else ifeq ($(shell uname -o),Msys)
-PLATFORM = msys2
-else
-$(error Unable to detect platform. Please open a ticket with the output of uname -a.)
-endif
-
-export PLATFORM
-endif
-
-ifeq ($(PLATFORM),msys2)
-	C_SRC_OUTPUT_EXECUTABLE_EXTENSION ?= .exe
-	C_SRC_OUTPUT_SHARED_EXTENSION ?= .dll
-	C_SRC_OUTPUT_STATIC_EXTENSION ?= .lib
-else
-	C_SRC_OUTPUT_EXECUTABLE_EXTENSION ?=
-	C_SRC_OUTPUT_SHARED_EXTENSION ?= .so
-	C_SRC_OUTPUT_STATIC_EXTENSION ?= .a
-endif
-
-ifeq ($(C_SRC_TYPE),shared)
-	C_SRC_OUTPUT_FILE = $(C_SRC_OUTPUT)$(C_SRC_OUTPUT_SHARED_EXTENSION)
-else ifeq ($(C_SRC_TYPE),static)
-	C_SRC_OUTPUT_FILE = $(C_SRC_OUTPUT)$(C_SRC_OUTPUT_STATIC_EXTENSION)
-else
-	C_SRC_OUTPUT_FILE = $(C_SRC_OUTPUT)$(C_SRC_OUTPUT_EXECUTABLE_EXTENSION)
-endif
-
-RANLIB ?= ranlib
-ARFLAGS ?= cr
-
-ifeq ($(PLATFORM),msys2)
-# We hardcode the compiler used on MSYS2. The default CC=cc does
-# not produce working code. The "gcc" MSYS2 package also doesn't.
-	CC = /mingw64/bin/gcc
-	CFLAGS ?= -O3 -std=c99 -finline-functions -fstack-protector -Wall -Wmissing-prototypes
-	CXXFLAGS ?= -O3 -finline-functions -fstack-protector -Wall
-else ifeq ($(PLATFORM),darwin)
+UNAME_SYS := $(shell uname -s)
+ifeq ($(UNAME_SYS), Darwin)
 	CC ?= cc
-	CFLAGS ?= -O3 -std=c99 -fstack-protector -Wall -Wmissing-prototypes
-	CXXFLAGS ?= -O3 -fstack-protector -Wall
+	CFLAGS ?= -O3 -std=c99 -finline-functions -Wall -Wmissing-prototypes
+	CXXFLAGS ?= -O3 -finline-functions -Wall
 	LDFLAGS ?= -flat_namespace -undefined suppress
-else ifeq ($(PLATFORM),freebsd)
+else ifeq ($(UNAME_SYS), FreeBSD)
 	CC ?= cc
-	CFLAGS ?= -O3 -std=c99 -finline-functions -fstack-protector -Wall -Wmissing-prototypes
-	CXXFLAGS ?= -O3 -finline-functions -fstack-protector -Wall
-else ifeq ($(PLATFORM),linux)
+	CFLAGS ?= -O3 -std=c99 -finline-functions -Wall -Wmissing-prototypes
+	CXXFLAGS ?= -O3 -finline-functions -Wall
+else ifeq ($(UNAME_SYS), Linux)
 	CC ?= gcc
-	CFLAGS ?= -O3 -std=c99 -finline-functions -fstack-protector -Wall -Wmissing-prototypes
-	CXXFLAGS ?= -O3 -finline-functions -fstack-protector -Wall
-else ifeq ($(PLATFORM),solaris)
-	CC ?= cc
-	CFLAGS ?= -O3 -std=c99 -finline-functions -fstack-protector -Wall -Wmissing-prototypes
-	CXXFLAGS ?= -O3 -finline-functions -fstack-protector -Wall
-	LDLIBS ?= -lssp
+	CFLAGS ?= -O3 -std=c99 -finline-functions -Wall -Wmissing-prototypes
+	CXXFLAGS ?= -O3 -finline-functions -Wall
 endif
 
-ifneq ($(PLATFORM),msys2)
-	CFLAGS += -fPIC
-	CXXFLAGS += -fPIC
-endif
+CFLAGS += -fPIC -I $(ERTS_INCLUDE_DIR) -I $(ERL_INTERFACE_INCLUDE_DIR)
+CXXFLAGS += -fPIC -I $(ERTS_INCLUDE_DIR) -I $(ERL_INTERFACE_INCLUDE_DIR)
 
-ifneq (,$(STATIC_ERLANG_NIF))
-	CFLAGS += -DSTATIC_ERLANG_NIF=1
-	CXXFLAGS += -DSTATIC_ERLANG_NIF=1
-endif
-
-CFLAGS += -I"$(ERTS_INCLUDE_DIR)" -I"$(ERL_INTERFACE_INCLUDE_DIR)"
-CXXFLAGS += -I"$(ERTS_INCLUDE_DIR)" -I"$(ERL_INTERFACE_INCLUDE_DIR)"
-
-NOINTERFACE := $(shell [ $(OTP_VERSION) -ge 23  ] && echo true)
-ifeq ($(NOINTERFACE),true)
-    LDLIBS += -L"$(ERL_INTERFACE_LIB_DIR)" -lei
-else
-    LDLIBS += -L"$(ERL_INTERFACE_LIB_DIR)" -lerl_interface -lei
-endif
+LDLIBS += -L $(ERL_INTERFACE_LIB_DIR) -lei
+LDFLAGS += -shared
 
 # Verbosity.
-
-V ?= 0
-
-verbose_0 = @
-verbose_2 = set -x;
-verbose = $(verbose_$(V))
 
 c_verbose_0 = @echo " C     " $(?F);
 c_verbose = $(c_verbose_$(V))
@@ -127,55 +45,18 @@ c_verbose = $(c_verbose_$(V))
 cpp_verbose_0 = @echo " CPP   " $(?F);
 cpp_verbose = $(cpp_verbose_$(V))
 
-dep_verbose_0 = @echo " DEP   " $(1);
-dep_verbose_2 = set -x;
-dep_verbose = $(dep_verbose_$(V))
-
-gen_verbose_0 = @echo " GEN   " $@;
-gen_verbose_2 = set -x;
-gen_verbose = $(gen_verbose_$(V))
-
 link_verbose_0 = @echo " LD    " $(@F);
 link_verbose = $(link_verbose_$(V))
 
-ar_verbose_0 = @echo " AR    " $(@F);
-ar_verbose = $(ar_verbose_$(V))
-
-ranlib_verbose_0 = @echo " RANLIB" $(@F);
-ranlib_verbose = $(ranlib_verbose_$(V))
-
-# Targets.
-
-core_find = $(if $(wildcard $1),$(shell find $(1:%/=%) -type f -name $(subst *,\*,$2)))
-
-ifeq ($(SOURCES),)
-	SOURCES := $(sort $(foreach pat,*.c *.C *.cc *.cpp,$(call core_find,$(C_SRC_DIR)/,$(pat))))
-endif
+SOURCES := $(shell find $(C_SRC_DIR) -type f \( -name "*.c" -o -name "*.C" -o -name "*.cc" -o -name "*.cpp" \))
 OBJECTS = $(addsuffix .o, $(basename $(SOURCES)))
 
 COMPILE_C = $(c_verbose) $(CC) $(CFLAGS) $(CPPFLAGS) -c
 COMPILE_CPP = $(cpp_verbose) $(CXX) $(CXXFLAGS) $(CPPFLAGS) -c
 
-all:: deps app
-
-app:: $(C_SRC_OUTPUT_FILE)
-
-deps::
-
-test-build:: $(C_SRC_OUTPUT_FILE)
-
-ifneq (static,$(C_SRC_TYPE))
-$(C_SRC_OUTPUT_FILE): $(OBJECTS)
-	$(verbose) mkdir -p $(BASEDIR)/priv/
-	$(link_verbose) $(CC) $(OBJECTS) \
-		$(LDFLAGS) $(if $(filter $(C_SRC_TYPE),shared),-shared) $(LDLIBS) \
-		-o $(C_SRC_OUTPUT_FILE)
-else
-$(C_SRC_OUTPUT_FILE): $(OBJECTS)
-	$(verbose) mkdir -p $(BASEDIR)/priv/
-	$(ar_verbose) $(AR) $(ARFLAGS) $(C_SRC_OUTPUT_FILE) $(OBJECTS)
-	$(ranlib_verbose) $(RANLIB) $(C_SRC_OUTPUT_FILE)
-endif
+$(C_SRC_OUTPUT): $(OBJECTS)
+	@mkdir -p $(BASEDIR)/priv/
+	$(link_verbose) $(CC) $(OBJECTS) $(LDFLAGS) $(LDLIBS) -o $(C_SRC_OUTPUT)
 
 %.o: %.c
 	$(COMPILE_C) $(OUTPUT_OPTION) $<
@@ -189,15 +70,5 @@ endif
 %.o: %.cpp
 	$(COMPILE_CPP) $(OUTPUT_OPTION) $<
 
-clean:: clean-c_src
-
-clean-c_src:
-	$(gen_verbose) rm -f $(C_SRC_OUTPUT_FILE) $(OBJECTS)
-
-ifneq ($(wildcard $(C_SRC_ENV)),)
--include $(C_SRC_ENV)
-else
-ERTS_INCLUDE_DIR ?= $(shell erl -noshell -s init stop -eval "io:format(\"~s/erts-~s/include/\", [code:root_dir(), erlang:system_info(version)]).")
-ERL_INTERFACE_INCLUDE_DIR ?= $(shell erl -noshell -s init stop -eval "io:format(\"~s\", [code:lib_dir(erl_interface, include)]).")
-ERL_INTERFACE_LIB_DIR ?= $(shell erl -noshell -s init stop -eval "io:format(\"~s\", [code:lib_dir(erl_interface, lib)]).")
-endif
+clean:
+	@rm -f $(C_SRC_OUTPUT) $(OBJECTS)

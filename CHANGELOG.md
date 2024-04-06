@@ -1,5 +1,11 @@
 # Changelog
 
+## 3.0.0 (2024-04-01)
+
+* Enhancements
+  * Fixed compilation with Erlang 26
+  * Changed from erlang-mk to rebar3
+
 ## 2.0.0 (2016-02-05)
 
 * Enhancements
