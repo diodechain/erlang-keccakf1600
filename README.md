@@ -1,12 +1,9 @@
 # Keccak-f[1600] NIF (SHA3-224, SHA3-256, SHA3-384, SHA3-512, SHAKE128, SHAKE256)
 
-[![Build Status](https://travis-ci.org/potatosalad/erlang-keccakf1600.png?branch=master)](https://travis-ci.org/potatosalad/erlang-keccakf1600) [![Hex.pm](https://img.shields.io/hexpm/v/keccakf1600.svg)](https://hex.pm/packages/keccakf1600)
-
 [Keccak-f[1600]](http://keccak.noekeon.org/) NIF with timeslice reductions for Erlang and Elixir.
 
 The timeslice reductions allow the NIF to perform operations on very large inputs without blocking the scheduler or requiring the Erlang VM to support dirty schedulers.  See the [bitwise](https://github.com/vinoski/bitwise) project from which the strategy was derived.
 
-Tested against the [FIPS 202](http://nvlpubs.nist.gov/nistpubs/FIPS/NIST.FIPS.202.pdf) test vectors.
 
 ## Installation
 
@@ -15,16 +12,16 @@ Add `keccakf1600` to your project's dependencies in `mix.exs`
 ```elixir
 defp deps do
   [
-    {:keccakf1600, "~> 2.0.0"}
+    :keccakf1600, github: "diodechain/erlang-keccakf1600"},
   ]
 end
 ```
 
-Add `keccakf1600` to your project's dependencies in your `Makefile` for [`erlang.mk`](https://github.com/ninenines/erlang.mk) or the following to your `rebar.config`
+Or add the following to your `rebar.config`
 
 ```erlang
 {deps, [
-  {keccakf1600, ".*", {git, "git://github.com/potatosalad/erlang-keccakf1600.git", {branch, "master"}}}
+  {keccakf1600, ".*", {git, "git://github.com/diodechain/erlang-keccakf1600.git", {branch, "master"}}}
 ]}.
 ```
 
